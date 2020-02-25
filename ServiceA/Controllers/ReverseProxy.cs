@@ -46,9 +46,10 @@ namespace ServiceA.Controllers
             return new WeatherResults { WeatherForecast1 = w1, WeatherForecast2 = w2 };
         }
 
-        [HttpGet("good")]
+        [HttpGet("noretry")]
         public async Task<WeatherResults> GetAsync([FromServices] WeatherClientTyped weatherClient)
         {
+            // need to add retrys
             var w1 = await weatherClient.GetWeather($"{Constants.serviceB}/WeatherForecast");
             var w2 = await weatherClient.GetWeather($"{Constants.serviceC}/WeatherForecast");
 

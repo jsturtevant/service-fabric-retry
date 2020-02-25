@@ -16,6 +16,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.12.1" />
     <PackageReference Include="Microsoft.ApplicationInsights.ServiceFabric.Native" Version="2.3.1" />
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="3.1.2" />
     <PackageReference Include="Microsoft.ServiceFabric.AspNetCore.Kestrel" Version="4.0.466" />
     <PackageReference Include="Microsoft.ServiceFabric.Diagnostics.Internal" Version="4.0.466" />
     <PackageReference Include="Microsoft.ServiceFabric.Services" Version="4.0.466" />

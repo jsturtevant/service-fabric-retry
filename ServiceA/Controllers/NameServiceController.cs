@@ -16,6 +16,7 @@ using Polly;
 using ServiceA.Services;
 using Microsoft.ServiceFabric.Services.Communication.Client;
 using System.Threading;
+using Microsoft.Extensions.Http;
 
 namespace ServiceA.Controllers
 {
@@ -24,16 +25,19 @@ namespace ServiceA.Controllers
     public class NameServiceController : ControllerBase
     {
         private readonly ILogger<NameServiceController> _logger;
-        private readonly IHttpClientFactory _clientFactory;
+        private readonly IHttpClientFactory clientFactory;
+        private readonly ITypedHttpClientFactory<WeatherClientTyped> _typedHttpClientFactory;
         private readonly IReadOnlyPolicyRegistry<string> _registry;
         private readonly ICommunicationClientFactory<ServiceFabricWeatherClient> serviceFabricClientFactory;
 
-        public NameServiceController(ILogger<NameServiceController> logger, 
-                                        IHttpClientFactory clientFactory,
+        public NameServiceController(ILogger<NameServiceController> logger,
+                                    IHttpClientFactory clientFactory,
+                                        ITypedHttpClientFactory<WeatherClientTyped> typedHttpClientFactory,
                                         IReadOnlyPolicyRegistry<string> registry)
         {
             _logger = logger;
-            _clientFactory = clientFactory;
+            this.clientFactory = clientFactory;
+            _typedHttpClientFactory = typedHttpClientFactory;
             _registry = registry;
             this.serviceFabricClientFactory = new ServiceFabricWeatherClientFactory(clientFactory);
         }
@@ -61,38 +65,33 @@ namespace ServiceA.Controllers
             return new WeatherResults { WeatherForecast1 = w1, WeatherForecast2 = w2 };
         }
 
-        [HttpGet("good")]
+        [HttpGet("noretry")]
         public async Task<WeatherResults> GetGood(string faults = "false")
         {
+            var client = this.clientFactory.CreateClient("noretry");
+            var typedclient = this._typedHttpClientFactory.CreateClient(client);
+
             string serviceB = await ResolveService(Constants.serviceB);
-            var bResult = await CallServiceAsync($"{serviceB}/WeatherForecast?faults={faults}");
-            var w1 = await ProcessServiceCallAsync(bResult);
+            var w1 = await typedclient.GetWeather($"{serviceB}/WeatherForecast?faults={faults}");
 
             string serviceC = await ResolveService(Constants.serviceC);
-            var cResult = await CallServiceAsync($"{serviceC}/WeatherForecast?faults={faults}");
-            var w2 = await ProcessServiceCallAsync(cResult);
+            var w2 = await typedclient.GetWeather($"{serviceC}/WeatherForecast?faults={faults}");
 
             return new WeatherResults{ WeatherForecast1 = w1, WeatherForecast2 = w2 };
         }
 
-        [HttpGet("good/retrys")]
+        [HttpGet("poly/retrys")]
         public async Task<WeatherResults> GetRetrys(string faults = "false")
         {
-            IAsyncPolicy<HttpResponseMessage> retryPolicy = this._registry.Get<IAsyncPolicy<HttpResponseMessage>>(Constants.backoffpolicy);
+            var client = this.clientFactory.CreateClient("retry");
+            var typedclient = this._typedHttpClientFactory.CreateClient(client);
 
-            var context = new Context($"GetSomeData-{Guid.NewGuid()}", new Dictionary<string, object>
-            {
-                { Constants.logger, _logger }
-            });
-
-            // todo perform service resolution
+            // todo perform service resolution if non transient
             string serviceB = await ResolveService(Constants.serviceB);
-            var bResult = await retryPolicy.ExecuteAsync(async (ctx) => await CallServiceAsync($"{serviceB}/WeatherForecast?faults={faults}"), context);
-            var w1 = await ProcessServiceCallAsync(bResult);
+            var w1 = await typedclient.GetWeather($"{serviceB}/WeatherForecast?faults={faults}");
 
             string serviceC = await ResolveService(Constants.serviceC);
-            var cResult = await retryPolicy.ExecuteAsync((ctx) => CallServiceAsync($"{serviceC}/WeatherForecast?faults={faults}"), context);
-            var w2 = await ProcessServiceCallAsync(cResult);
+            var w2 = await typedclient.GetWeather($"{serviceC}/WeatherForecast?faults={faults}");
 
             return new WeatherResults { WeatherForecast1 = w1, WeatherForecast2 = w2 };
         }
@@ -114,22 +113,6 @@ namespace ServiceA.Controllers
                                 }, CancellationToken.None);
 
             return new WeatherResults { WeatherForecast1 = w1, WeatherForecast2 = w2 };
-        }
-
-        private async Task<HttpResponseMessage> CallServiceAsync(string message)
-        {
-            HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, message);
-            HttpClient client = this._clientFactory.CreateClient();
-            return await client.SendAsync(req);
-        }
-
-        private async Task<IEnumerable<WeatherForecast>> ProcessServiceCallAsync(HttpResponseMessage response)
-        {
-            response.EnsureSuccessStatusCode();
-            using (var contentStream = await response.Content.ReadAsStreamAsync())
-            {
-                return await System.Text.Json.JsonSerializer.DeserializeAsync<List<WeatherForecast>>(contentStream, DefaultJsonSerializerOptions.Options); ;
-            }
         }
 
         private  async Task<string> ResolveService(string serviceName)

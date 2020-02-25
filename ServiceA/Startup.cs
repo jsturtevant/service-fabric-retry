@@ -13,7 +13,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Polly;
-using ServiceA.Controllers;
 using ServiceA.Services;
 
 namespace ServiceA
@@ -32,9 +31,12 @@ namespace ServiceA
         {
             services.AddControllers();
             services.AddApplicationInsightsTelemetry();
-            services.AddHttpClient<WeatherClientTyped>("reverseProxy", x => { x.BaseAddress = new Uri(Constants.reverseProxy); });
-            services.AddHttpClient();
             services.AddPollyPolicies();
+
+            // Created multiple http clients for demonstration purposes.
+            services.AddHttpClient<WeatherClientTyped>("noretry", x => { x.BaseAddress = new Uri(Constants.reverseProxy); });
+            services.AddHttpClient("retry").AddPolicyHandlerFromRegistry(Constants.backoffpolicy);
+            services.AddHttpClient("sf");
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
