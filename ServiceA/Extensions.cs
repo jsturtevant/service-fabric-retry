@@ -29,5 +29,7 @@ namespace ServiceA
             var list = enumerable as IList<T> ?? enumerable.ToList();
             return list.Count == 0 ? default(T) : list[r.Next(0, list.Count)];
         }
+
+       
     }
 }

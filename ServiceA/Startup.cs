@@ -32,11 +32,20 @@ namespace ServiceA
             services.AddControllers();
             services.AddApplicationInsightsTelemetry();
             services.AddPollyPolicies();
+            services.AddSingleton<IServiceResolver, ServiceResolver>();
 
             // Created multiple http clients for demonstration purposes.
             services.AddHttpClient<WeatherClientTyped>("noretry", x => { x.BaseAddress = new Uri(Constants.reverseProxy); });
-            services.AddHttpClient("retry").AddPolicyHandlerFromRegistry(Constants.backoffpolicy);
-            services.AddHttpClient("sf");
+            services.AddHttpClient("retry", client =>
+                {
+                    client.Timeout = TimeSpan.FromSeconds(15); // Overall timeout across all tries
+                })
+                .AddPolicyHandlerFromRegistry(Constants.backoffpolicy)
+                .AddPolicyHandler(Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromSeconds(5))); //timeout per request https://github.com/App-vNext/Polly/wiki/Polly-and-HttpClientFactory#use-case-applying-timeouts
+            services.AddHttpClient("sf", client =>
+                {
+                    client.Timeout = TimeSpan.FromSeconds(5); // Overall timeout for http client
+                });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

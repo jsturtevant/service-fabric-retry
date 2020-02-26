@@ -2,11 +2,13 @@
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Registry;
+using Polly.Timeout;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 
 namespace ServiceA.Services
@@ -21,13 +23,16 @@ namespace ServiceA.Services
                HttpStatusCode.InternalServerError, // 500
                HttpStatusCode.BadGateway, // 502
                HttpStatusCode.ServiceUnavailable, // 503
-               HttpStatusCode.GatewayTimeout // 504
+               HttpStatusCode.GatewayTimeout, // 504
+               HttpStatusCode.NotFound // possible address resolved by fabric client is stale 
             };
 
             var backOffPolicy = Policy
               .Handle<HttpRequestException>()
               .Or<OperationCanceledException>()
               .OrResult<HttpResponseMessage>(r => httpStatusCodesWorthRetrying.Contains(r.StatusCode))
+              .Or<TimeoutRejectedException>()
+              .Or<SocketException>()
               .WaitAndRetryAsync(new[]
                   {
                     TimeSpan.FromSeconds(1),
@@ -35,6 +40,7 @@ namespace ServiceA.Services
                     TimeSpan.FromSeconds(3)
                   }, (result, timeSpan, retryCount, context) =>
                   {
+                      IServiceResolver serviceResolver = context.GetServiceResolver();
                       if (result.Exception != null)
                       {
                           context.GetLogger()?.LogError(result.Exception, "An exception occurred on retry {RetryAttempt} for {PolicyKey}", retryCount, context.PolicyKey);
@@ -68,6 +74,22 @@ namespace ServiceA.Services
             if (context.TryGetValue(Constants.logger, out object logger))
             {
                 return logger as ILogger;
+            }
+
+            return null;
+        }
+
+        public static Context WithServiceResolver(this Context context, IServiceResolver resolver)
+        {
+            context[Constants.resolver] = resolver;
+            return context;
+        }
+
+        public static IServiceResolver GetServiceResolver(this Context context)
+        {
+            if (context.TryGetValue(Constants.resolver, out object logger))
+            {
+                return logger as IServiceResolver;
             }
 
             return null;

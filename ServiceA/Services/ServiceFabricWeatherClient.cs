@@ -27,7 +27,7 @@ namespace ServiceA.Services
         public async Task<IEnumerable<WeatherForecast>> CallServiceAsync(string message)
         {
             HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, $"{this.Url}/{message}");
-            HttpClient client = clientFactory.CreateClient();
+            HttpClient client = clientFactory.CreateClient("sf");
             var result = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
             result.EnsureSuccessStatusCode();
             using (var contentStream = await result.Content.ReadAsStreamAsync())

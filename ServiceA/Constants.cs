@@ -9,6 +9,7 @@
 
         public static string backoffpolicy = "backoffpolicy";
         public static string logger = "logger";
+        internal static string resolver = "resolver";
     }
 
 
