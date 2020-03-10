@@ -13,6 +13,7 @@ using Microsoft.ServiceFabric.Services.Runtime;
 using Microsoft.ServiceFabric.Data;
 using Microsoft.ApplicationInsights.ServiceFabric;
 using Microsoft.ApplicationInsights.Extensibility;
+using System.Diagnostics;
 
 namespace ServiceC
 {
